@@ -1,29 +1,64 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
+	"os"
 
+	"github.com/Alexeychuk/Gator/internal/command"
 	"github.com/Alexeychuk/Gator/internal/config"
+	"github.com/Alexeychuk/Gator/internal/database"
+	_ "github.com/lib/pq"
 )
 
 func main() {
-	currentConfig, err := config.Read()
+	foundConfig, err := config.Read()
 	if err != nil {
 		return
 	}
 
-	fmt.Printf("db: %s, user: %s\n", currentConfig.DBUrl, currentConfig.Username)
+	state := command.State{
+		Cfg: foundConfig,
+	}
 
-	err = currentConfig.SetUser("Vova")
+	commands := command.Commands{}
+
+	commands.Register("login", command.HandlerLogin)
+	commands.Register("register", command.HandlerRegister)
+	commands.Register("reset", command.HandlerReset)
+	commands.Register("users", command.HandlerGetUsers)
+	commands.Register("agg", command.HandlerAgg)
+	commands.Register("addfeed", command.HandlerAddFeed)
+	commands.Register("feeds", command.HandlerGetFeeds)
+
+	db, err := sql.Open("postgres", foundConfig.DBUrl)
+
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
-	currentConfig, err = config.Read()
-	if err != nil {
-		return
+	dbQueries := database.New(db)
+	state.Db = dbQueries
+
+	if len(os.Args) < 2 {
+		fmt.Print("Not enough arguments\n")
+		os.Exit(1)
 	}
 
-	fmt.Printf("db: %s, user: %s\n", currentConfig.DBUrl, currentConfig.Username)
+	// command running
+
+	var madeCommand command.Command
+	madeCommand.Name = os.Args[1]
+	madeCommand.Args = os.Args[2:]
+	fmt.Println(os.Args)
+
+	err = commands.Run(&state, madeCommand)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// fmt.Printf("db: %s, user: %s\n", foundConfig.DBUrl, foundConfig.Username)
 
 }

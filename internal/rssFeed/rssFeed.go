@@ -3,9 +3,11 @@ package rssfeed
 import (
 	"context"
 	"encoding/xml"
+	"fmt"
 	"html"
 	"io"
 	"net/http"
+	"time"
 )
 
 type RSSFeed struct {
@@ -23,6 +25,30 @@ type RSSItem struct {
 	Description string `xml:"description"`
 	PubDate     string `xml:"pubDate"`
 	Guid        string `xml:"guid"`
+}
+
+// Helper function to parse RSS time formats
+func ParseRSSTime(dateStr string) (time.Time, error) {
+	if dateStr == "" {
+		return time.Time{}, fmt.Errorf("empty date string")
+	}
+
+	// Common RSS date formats
+	layouts := []string{
+		time.RFC1123Z,                    // "Mon, 02 Jan 2006 15:04:05 -0700"
+		time.RFC1123,                     // "Mon, 02 Jan 2006 15:04:05 MST"
+		"Mon, 2 Jan 2006 15:04:05 -0700", // Single digit day
+		"2006-01-02T15:04:05Z",           // ISO 8601
+		"2006-01-02 15:04:05",            // Simple format
+	}
+
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, dateStr); err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse date: %s", dateStr)
 }
 
 func FetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
